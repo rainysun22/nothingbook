@@ -1,6 +1,6 @@
 use crate::note::Note;
 use gpui::*;
-use gpui_component::{button::Button, v_flex};
+use gpui_component::{button::Button, input::Input, input::InputEvent, input::InputState, v_flex};
 
 #[derive(Clone)]
 pub struct SidebarEvent(pub String);
@@ -19,6 +19,7 @@ pub struct SidebarView {
     selected_note_id: Option<String>,
     editing_note_id: Option<String>,
     rename_title: String,
+    input_state: Option<Entity<InputState>>,
 }
 
 impl SidebarView {
@@ -28,6 +29,7 @@ impl SidebarView {
             selected_note_id: None,
             editing_note_id: None,
             rename_title: String::new(),
+            input_state: None,
         }
     }
 
@@ -43,10 +45,37 @@ impl SidebarView {
         self.editing_note_id = note_id;
     }
 
-    pub fn start_editing(&mut self, note_id: String) {
+    pub fn start_editing(&mut self, note_id: String, window: &mut Window, cx: &mut Context<Self>) {
         self.editing_note_id = Some(note_id.clone());
         if let Some(note) = self.notes.iter().find(|n| n.id == note_id) {
             self.rename_title = note.title.clone();
+            let input_state = cx.new(|cx| InputState::new(window, cx));
+            input_state.update(cx, |state, cx| {
+                state.set_value(note.title.clone(), window, cx);
+                state.focus(window, cx);
+            });
+            self.input_state = Some(input_state.clone());
+
+            cx.subscribe(
+                &input_state,
+                move |this, _, event: &InputEvent, cx| match event {
+                    InputEvent::Change => {
+                        if let Some(ref state) = this.input_state {
+                            let value = state.read(cx).value().to_string();
+                            this.rename_title = value;
+                            cx.notify();
+                        }
+                    }
+                    InputEvent::PressEnter { .. } => {
+                        if let Some((id, title)) = this.confirm_rename() {
+                            cx.emit(SidebarRenameNote(id, title));
+                        }
+                    }
+                    InputEvent::Focus => {}
+                    InputEvent::Blur => {}
+                },
+            )
+            .detach();
         }
     }
 
@@ -65,6 +94,7 @@ impl SidebarView {
     pub fn cancel_rename(&mut self) {
         self.editing_note_id = None;
         self.rename_title.clear();
+        self.input_state = None;
     }
 
     pub fn confirm_rename(&mut self) -> Option<(String, String)> {
@@ -72,9 +102,11 @@ impl SidebarView {
             if !self.rename_title.is_empty() {
                 let title = self.rename_title.clone();
                 self.rename_title.clear();
+                self.input_state = None;
                 return Some((note_id, title));
             }
             self.rename_title.clear();
+            self.input_state = None;
         }
         None
     }
@@ -154,14 +186,9 @@ impl Render for SidebarView {
                                 .child("重命名笔记"),
                         )
                         .child(
-                            div()
-                                .border_1()
-                                .border_color(gpui::rgb(0xd1d5db))
-                                .rounded_md()
-                                .p_2()
-                                .w_full()
-                                .text_base()
-                                .child(self.rename_title.clone()),
+                            Input::new(self.input_state.as_ref().unwrap())
+                                .bordered(false)
+                                .w_full(),
                         )
                         .child(
                             v_flex()
@@ -228,8 +255,8 @@ impl Render for SidebarView {
                                         .child(Button::new("rename-btn").label("重命名").on_click(
                                             cx.listener({
                                                 let note_id = note_id_for_rename.clone();
-                                                move |this, _, _window, _cx| {
-                                                    this.start_editing(note_id.clone());
+                                                move |this, _, window, cx| {
+                                                    this.start_editing(note_id.clone(), window, cx);
                                                 }
                                             }),
                                         ))

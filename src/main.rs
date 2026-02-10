@@ -1,24 +1,21 @@
 use gpui::*;
 
 use crate::app::AppView;
+mod app;
 mod note;
 mod storage;
-mod app;
 mod views;
 
 fn main() -> anyhow::Result<()> {
     let app = Application::new().with_assets(gpui_component_assets::Assets);
     app.run(|cx| {
         gpui_component::init(cx);
-        cx.open_window(
-            WindowOptions::default(),
-            |_window, cx| {
-                let app_view = cx.new(|cx| {
-                    AppView::new(cx).expect("初始化应用失败")
-                });
-                app_view
-            },
-        )
+        cx.open_window(WindowOptions::default(), |window, cx| {
+            let app_view = cx.new(|cx| AppView::new(cx).expect("初始化应用失败"));
+            let root: Entity<gpui_component::Root> =
+                cx.new(|cx| gpui_component::Root::new(app_view.clone(), window, cx));
+            root
+        })
         .expect("创建窗口失败");
     });
 
