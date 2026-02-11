@@ -23,11 +23,6 @@ impl Note {
         }
     }
 
-    pub fn update_title(&mut self, new_title: String) {
-        self.title = new_title;
-        self.updated_at = Local::now();
-    }
-
     pub fn preview(&self) -> String {
         if self.content.is_empty() {
             "无内容".to_string()

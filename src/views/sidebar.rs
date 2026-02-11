@@ -83,14 +83,6 @@ impl SidebarView {
         self.editing_note_id.as_ref() == Some(&note_id.to_string())
     }
 
-    pub fn get_rename_value(&self) -> String {
-        self.rename_title.clone()
-    }
-
-    pub fn set_rename_value(&mut self, value: String) {
-        self.rename_title = value;
-    }
-
     pub fn cancel_rename(&mut self) {
         self.editing_note_id = None;
         self.rename_title.clear();
@@ -197,7 +189,6 @@ impl Render for SidebarView {
                                 .flex_row()
                                 .child(Button::new("confirm-rename").label("确认").on_click(
                                     cx.listener({
-                                        let note_id = note_id.clone();
                                         move |this, _, _window, cx| {
                                             if let Some((id, title)) = this.confirm_rename() {
                                                 cx.emit(SidebarRenameNote(id, title));

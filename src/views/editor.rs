@@ -11,17 +11,12 @@ impl EditorView {
         Self { current_note: None }
     }
 
-    pub fn load_note(&mut self, note: Note, cx: &mut Context<Self>) {
+    pub fn load_note(&mut self, note: Note, _cx: &mut Context<Self>) {
         self.current_note = Some(note.clone());
-        cx.notify();
     }
 
     pub fn clear(&mut self) {
         self.current_note = None;
-    }
-
-    pub fn current_note_id(&self) -> Option<String> {
-        self.current_note.as_ref().map(|n| n.id.clone())
     }
 }
 

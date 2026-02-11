@@ -56,8 +56,4 @@ impl Storage {
         }
         Ok(())
     }
-
-    pub fn data_dir(&self) -> &PathBuf {
-        &self.data_dir
-    }
 }
