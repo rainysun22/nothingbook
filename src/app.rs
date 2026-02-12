@@ -16,7 +16,6 @@ pub struct AppView {
     sidebar: Entity<SidebarView>,
     editor: Entity<EditorView>,
     notes: Arc<Vec<Note>>,
-    selected_note_id: Option<String>,
     storage: Storage,
 }
 
@@ -39,11 +38,10 @@ impl AppView {
             sidebar,
             editor,
             notes: notes_arc,
-            selected_note_id,
             storage,
         };
 
-        if let Some(ref note_id) = app.selected_note_id {
+        if let Some(ref note_id) = selected_note_id {
             if let Some(note) = app.notes.iter().find(|n| &n.id == note_id) {
                 app.editor.update(cx, |editor, cx| {
                     editor.load_note(note.clone(), cx);
@@ -99,7 +97,6 @@ impl AppView {
             editor.load_note(new_note, cx);
         });
 
-        self.selected_note_id = Some(note_id);
         cx.notify();
     }
 
@@ -123,7 +120,6 @@ impl AppView {
             editor.clear();
         });
 
-        self.selected_note_id = None;
         cx.notify();
     }
 
@@ -145,13 +141,11 @@ impl AppView {
                 sidebar.set_editing(None);
             });
 
-            if Some(&note_id) == self.selected_note_id.as_ref() {
-                self.editor.update(cx, |editor, cx| {
-                    if let Some(note) = self.notes.iter().find(|n| n.id == note_id) {
-                        editor.load_note(note.clone(), cx);
-                    }
-                });
-            }
+            self.editor.update(cx, |editor, cx| {
+                if let Some(note) = self.notes.iter().find(|n| n.id == note_id) {
+                    editor.load_note(note.clone(), cx);
+                }
+            });
 
             cx.notify();
         }
@@ -165,7 +159,6 @@ impl AppView {
             self.sidebar.update(cx, |sidebar, _cx| {
                 sidebar.set_selected(Some(note_id.clone()));
             });
-            self.selected_note_id = Some(note_id);
             cx.notify();
         }
     }
