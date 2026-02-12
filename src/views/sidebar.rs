@@ -1,6 +1,7 @@
 use crate::note::Note;
 use gpui::*;
 use gpui_component::{button::Button, input::Input, input::InputEvent, input::InputState, v_flex};
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct SidebarEvent(pub String);
@@ -15,7 +16,7 @@ pub struct SidebarDeleteNote(pub String);
 pub struct SidebarRenameNote(pub String, pub String);
 
 pub struct SidebarView {
-    notes: Vec<Note>,
+    notes: HashMap<String, Note>,
     selected_note_id: Option<String>,
     editing_note_id: Option<String>,
     rename_title: String,
@@ -23,9 +24,9 @@ pub struct SidebarView {
 }
 
 impl SidebarView {
-    pub fn new(notes: Vec<Note>) -> Self {
+    pub fn new(notes: &HashMap<String, Note>) -> Self {
         Self {
-            notes,
+            notes: notes.clone(),
             selected_note_id: None,
             editing_note_id: None,
             rename_title: String::new(),
@@ -33,7 +34,7 @@ impl SidebarView {
         }
     }
 
-    pub fn update_notes(&mut self, notes: Vec<Note>) {
+    pub fn update_notes(&mut self, notes: HashMap<String, Note>) {
         self.notes = notes;
     }
 
@@ -47,7 +48,7 @@ impl SidebarView {
 
     pub fn start_editing(&mut self, note_id: String, window: &mut Window, cx: &mut Context<Self>) {
         self.editing_note_id = Some(note_id.clone());
-        if let Some(note) = self.notes.iter().find(|n| n.id == note_id) {
+        if let Some(note) = self.notes.get(&note_id) {
             self.rename_title = note.title.clone();
             let input_state = cx.new(|cx| InputState::new(window, cx));
             input_state.update(cx, |state, cx| {
@@ -153,17 +154,17 @@ impl Render for SidebarView {
                 let is_selected = self
                     .selected_note_id
                     .as_ref()
-                    .map_or(false, |id| id == &note.id);
-                let is_editing = self.is_editing(&note.id);
+                    .map_or(false, |id| id == note.0);
+                let is_editing = self.is_editing(&note.0);
 
-                let note_id = note.id.clone();
-                let note_title = note.title.clone();
-                let note_id_for_rename = note.id.clone();
-                let note_id_for_delete = note.id.clone();
+                let note_id = note.0.clone();
+                let note_title = &note.1.title;
+                let note_id_for_rename = note.0;
+                let note_id_for_delete = note.0;
 
                 if is_editing {
                     div()
-                        .id(SharedString::from(note_id.clone()))
+                        .id(SharedString::from(note_id))
                         .px_4()
                         .py_3()
                         .border_b_1()
@@ -204,7 +205,7 @@ impl Render for SidebarView {
                         )
                 } else {
                     div()
-                        .id(SharedString::from(note_id.clone()))
+                        .id(SharedString::from(&note_id))
                         .px_4()
                         .py_3()
                         .border_b_1()
@@ -216,7 +217,6 @@ impl Render for SidebarView {
                             gpui::rgb(0xf9fafb)
                         })
                         .on_click(cx.listener({
-                            let note_id = note_id.clone();
                             move |this, _, _window, cx| {
                                 this.selected_note_id = Some(note_id.clone());
                                 cx.emit(SidebarEvent(note_id.clone()));
@@ -271,7 +271,7 @@ impl Render for SidebarView {
                                     gpui::rgb(0x6b7280)
                                 })
                                 .truncate()
-                                .child(note.preview()),
+                                .child(note.1.preview()),
                         )
                         .child(
                             div()
@@ -282,7 +282,7 @@ impl Render for SidebarView {
                                 } else {
                                     gpui::rgb(0x9ca3af)
                                 })
-                                .child(note.formatted_time()),
+                                .child(note.1.formatted_time()),
                         )
                 }
             })))

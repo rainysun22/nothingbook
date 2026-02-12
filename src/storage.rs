@@ -2,6 +2,7 @@ use crate::note::Note;
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
+use std::collections::HashMap;
 #[derive(Clone)]
 pub struct Storage {
     data_dir: PathBuf,
@@ -26,8 +27,8 @@ impl Storage {
         Ok(())
     }
 
-    pub fn load_all_notes(&self) -> Result<Vec<Note>> {
-        let mut notes = Vec::new();
+    pub fn load_all_notes(&self) -> Result<HashMap<String, Note>> {
+        let mut notes = HashMap::new();
         let entries = fs::read_dir(&self.data_dir).context("无法读取数据目录")?;
 
         for entry in entries {
@@ -38,14 +39,15 @@ impl Storage {
                 let content =
                     fs::read_to_string(&path).context(format!("读取文件失败: {:?}", path))?;
                 match serde_json::from_str::<Note>(&content) {
-                    Ok(note) => notes.push(note),
+                    Ok(note) => {
+                        notes.insert(note.id.clone(), note);
+                    },
                     Err(e) => {
                         eprintln!("解析笔记文件失败 {:?}: {}", path, e);
                     }
                 }
             }
         }
-        notes.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
         Ok(notes)
     }
 

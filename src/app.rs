@@ -10,12 +10,12 @@ use crate::{
 };
 use gpui::*;
 use gpui_component::h_flex;
-use std::sync::Arc;
+use std::collections::HashMap;
 
 pub struct AppView {
     sidebar: Entity<SidebarView>,
     editor: Entity<EditorView>,
-    notes: Arc<Vec<Note>>,
+    notes: HashMap<String, Note>,
     storage: Storage,
 }
 
@@ -23,26 +23,24 @@ impl AppView {
     pub fn new(cx: &mut Context<Self>) -> anyhow::Result<Self> {
         let storage = Storage::new()?;
         let notes = storage.load_all_notes()?;
-        let notes_arc = Arc::new(notes);
 
         let sidebar = cx.new(|_cx| {
-            let notes_clone = notes_arc.to_vec();
-            SidebarView::new(notes_clone)
+            SidebarView::new(&notes)
         });
 
         let editor = cx.new(|cx| EditorView::new(cx));
 
-        let selected_note_id = notes_arc.first().map(|n| n.id.clone());
+        let selected_note_id = notes.keys().next().map(|k| k.clone());
 
         let app = Self {
             sidebar,
             editor,
-            notes: notes_arc,
+            notes: notes,
             storage,
         };
 
-        if let Some(ref note_id) = selected_note_id {
-            if let Some(note) = app.notes.iter().find(|n| &n.id == note_id) {
+        if let Some(note_id) = &selected_note_id {
+            if let Some(note) = app.notes.get(note_id) {
                 app.editor.update(cx, |editor, cx| {
                     editor.load_note(note.clone(), cx);
                 });
@@ -77,19 +75,17 @@ impl AppView {
 
     fn create_new_note(&mut self, cx: &mut Context<Self>) {
         let new_note = Note::new();
-        let note_id = new_note.id.clone();
+        let note_id = &new_note.id;
 
         if let Err(e) = self.storage.save_note(&new_note) {
             eprintln!("保存新笔记失败: {}", e);
             return;
         }
 
-        let mut notes = (*self.notes).clone();
-        notes.insert(0, new_note.clone());
-        self.notes = Arc::new(notes);
+        self.notes.insert(note_id.clone(), new_note.clone());
 
         self.sidebar.update(cx, |sidebar, _cx| {
-            sidebar.update_notes((*self.notes).clone());
+            sidebar.update_notes(self.notes.clone());
             sidebar.set_selected(Some(note_id.clone()));
         });
 
@@ -106,12 +102,10 @@ impl AppView {
             return;
         }
 
-        let mut notes = (*self.notes).clone();
-        notes.retain(|n| n.id != note_id);
-        self.notes = Arc::new(notes);
+        self.notes.retain(|k, _| k != &note_id);
 
         self.sidebar.update(cx, |sidebar, _cx| {
-            sidebar.update_notes((*self.notes).clone());
+            sidebar.update_notes(self.notes.clone());
             sidebar.set_editing(None);
             sidebar.set_selected(None);
         });
@@ -124,27 +118,27 @@ impl AppView {
     }
 
     fn rename_note(&mut self, note_id: String, new_title: String, cx: &mut Context<Self>) {
-        let mut notes = (*self.notes).clone();
-        if let Some(note) = notes.iter_mut().find(|n| n.id == note_id) {
-            note.title = new_title.clone();
-            note.updated_at = chrono::Local::now();
+        let note_exists = self.notes.contains_key(&note_id);
 
-            if let Err(e) = self.storage.save_note(note) {
-                eprintln!("重命名笔记失败: {}", e);
-                return;
+        if note_exists {
+            let note_clone = self.notes.get(&note_id).cloned().unwrap();
+            if let Some(note) = self.notes.get_mut(&note_id) {
+                note.title = new_title;
+                note.updated_at = chrono::Local::now();
+
+                if let Err(e) = self.storage.save_note(note) {
+                    eprintln!("重命名笔记失败: {}", e);
+                    return;
+                }
             }
 
-            self.notes = Arc::new(notes);
-
             self.sidebar.update(cx, |sidebar, _cx| {
-                sidebar.update_notes((*self.notes).clone());
+                sidebar.update_notes(self.notes.clone());
                 sidebar.set_editing(None);
             });
 
             self.editor.update(cx, |editor, cx| {
-                if let Some(note) = self.notes.iter().find(|n| n.id == note_id) {
-                    editor.load_note(note.clone(), cx);
-                }
+                editor.load_note(note_clone, cx);
             });
 
             cx.notify();
@@ -152,7 +146,7 @@ impl AppView {
     }
 
     fn select_note(&mut self, note_id: String, cx: &mut Context<Self>) {
-        if let Some(note) = self.notes.iter().find(|n| n.id == note_id) {
+        if let Some(note) = self.notes.get(&note_id) {
             self.editor.update(cx, |editor, cx| {
                 editor.load_note(note.clone(), cx);
             });
