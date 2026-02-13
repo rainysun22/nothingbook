@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Note {
-    pub id: String,
+    pub id: u128,
     pub title: String,
     pub content: String,
     pub created_at: DateTime<Local>,
@@ -15,7 +15,7 @@ impl Note {
     pub fn new() -> Self {
         let now = Local::now();
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: Uuid::new_v4().to_u128_le(),
             title: "新建笔记".to_string(),
             content: String::new(),
             created_at: now,

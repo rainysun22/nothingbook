@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
 use std::collections::HashMap;
-#[derive(Clone)]
+
 pub struct Storage {
     data_dir: PathBuf,
 }
@@ -27,8 +27,7 @@ impl Storage {
         Ok(())
     }
 
-    pub fn load_all_notes(&self) -> Result<HashMap<String, Note>> {
-        let mut notes = HashMap::new();
+    pub fn load_all_notes(&self, notes: &mut HashMap<u128, Note>) -> Result<()> {
         let entries = fs::read_dir(&self.data_dir).context("无法读取数据目录")?;
 
         for entry in entries {
@@ -40,7 +39,7 @@ impl Storage {
                     fs::read_to_string(&path).context(format!("读取文件失败: {:?}", path))?;
                 match serde_json::from_str::<Note>(&content) {
                     Ok(note) => {
-                        notes.insert(note.id.clone(), note);
+                        notes.insert(note.id, note);
                     },
                     Err(e) => {
                         eprintln!("解析笔记文件失败 {:?}: {}", path, e);
@@ -48,10 +47,10 @@ impl Storage {
                 }
             }
         }
-        Ok(notes)
+        Ok(())
     }
 
-    pub fn delete_note(&self, note_id: &str) -> Result<()> {
+    pub fn delete_note(&self, note_id: u128) -> Result<()> {
         let file_path = self.data_dir.join(format!("{}.json", note_id));
         if file_path.exists() {
             fs::remove_file(&file_path).context("删除笔记文件失败")?;

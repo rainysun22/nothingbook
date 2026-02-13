@@ -11,7 +11,7 @@ impl EditorView {
         Self { current_note: None }
     }
 
-    pub fn load_note(&mut self, note: Note, _cx: &mut Context<Self>) {
+    pub fn load_note(&mut self, note: &Note, _cx: &mut Context<Self>) {
         self.current_note = Some(note.clone());
     }
 
