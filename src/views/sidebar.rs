@@ -1,3 +1,4 @@
+use crate::note_list::NoteList;
 use gpui::*;
 use gpui_component::{button::Button, v_flex};
 
@@ -8,12 +9,14 @@ pub enum SidebarEvent {
 }
 
 pub struct SidebarView {
+    notes: Entity<NoteList>,
     selected_note_id: Option<u128>,
 }
 
 impl SidebarView {
-    pub fn new() -> Self {
+    pub fn new(notes: Entity<NoteList>) -> Self {
         Self {
+            notes,
             selected_note_id: None,
         }
     }
@@ -27,6 +30,9 @@ impl EventEmitter<SidebarEvent> for SidebarView {}
 
 impl Render for SidebarView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let notes = self.notes.read(cx);
+        let note_list = notes.get_all();
+
         v_flex()
             .h_full()
             .w(px(280.0))
@@ -49,13 +55,51 @@ impl Render for SidebarView {
                             .font_weight(FontWeight::SEMIBOLD)
                             .child("我的笔记"),
                     )
-                    .child(
-                        Button::new("new-note")
-                            .label("新建")
-                            .on_click(cx.listener(|_, _, _window, cx| {
-                                cx.emit(SidebarEvent::CreateNote);
-                            })),
-                    ),
+                    .child(Button::new("new-note").label("新建").on_click(cx.listener(
+                        |_, _, _window, cx| {
+                            cx.emit(SidebarEvent::CreateNote);
+                        },
+                    ))),
             )
+            .child(
+                v_flex()
+                    .flex_1()
+                    .overflow_hidden()
+                    .children(note_list.iter().map(|note| {
+                        let note_id = note.id;
+                        let is_selected = self.selected_note_id == Some(note_id);
+                        div()
+                            .p_3()
+                            .border_b_1()
+                            .border_color(gpui::rgb(0xe5e7eb))
+                            .cursor_pointer()
+                            .bg(if is_selected {
+                                gpui::rgb(0xe0e7ff)
+                            } else {
+                                gpui::rgb(0xf9fafb)
+                            })
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |_, _, _window, cx| {
+                                    cx.emit(SidebarEvent::SelectNote(note_id));
+                                }),
+                            )
+                            .child(
+                                div()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_base()
+                                    .child(note.title.clone()),
+                            )
+                            .child(div().mt_1().text_sm().child(note.preview()))
+                            .child(
+                                div()
+                                    .mt_1()
+                                    .text_xs()
+                                    .text_color(gpui::rgb(0x9ca3af))
+                                    .child(note.formatted_time()),
+                            )
+                    })),
+            )
+            .into_any_element()
     }
 }

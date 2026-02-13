@@ -1,6 +1,6 @@
 use crate::{
     note::Note,
-    storage::Storage,
+    note_list::NoteList,
     views::{
         editor::EditorView,
         sidebar::{SidebarEvent, SidebarView},
@@ -8,48 +8,32 @@ use crate::{
 };
 use gpui::*;
 use gpui_component::h_flex;
-use std::collections::HashMap;
 
 pub struct AppView {
     sidebar: Entity<SidebarView>,
     editor: Entity<EditorView>,
-    storage: Storage,
-    notes: HashMap<u128, Note>,
+    notes: Entity<NoteList>,
 }
 
 impl AppView {
     pub fn new(cx: &mut Context<Self>) -> anyhow::Result<Self> {
-        let storage = Storage::new()?;
-        let mut notes: HashMap<u128, Note> = HashMap::new();
-        storage.load_all_notes(&mut notes)?;
-
-        let sidebar = cx.new(|_cx| {
-            SidebarView::new()
-        });
+        let notes = cx.new(|cx| NoteList::new(cx));
+        let sidebar = cx.new(|_cx| SidebarView::new(notes.clone()));
         let editor = cx.new(|cx| EditorView::new(cx));
 
         let app = Self {
             sidebar,
             editor,
-            storage,
             notes,
         };
 
-        if let Some(note_id) = app.notes.keys().next().copied() {
-            if let Some(note) = app.notes.get(&note_id) {
-                app.editor.update(cx, |editor, cx| {
-                    editor.load_note(note, cx);
-                });
-                app.sidebar.update(cx, |sidebar, _cx| {
-                    sidebar.set_selected(Some(note_id));
-                });
-            }
-        }
-
-        cx.subscribe(&app.sidebar, |this: &mut AppView, _, event: &SidebarEvent, cx| {
-            this.handle_sidebar_event(event, cx);
-        })
-        .detach();  
+        cx.subscribe(
+            &app.sidebar,
+            |this: &mut AppView, _, event: &SidebarEvent, cx| {
+                this.handle_sidebar_event(event, cx);
+            },
+        )
+        .detach();
 
         // TODO：订阅edit事件
 
@@ -68,7 +52,7 @@ impl AppView {
         let note = Note::new();
         let id = note.id;
 
-        if let Err(e) = self.storage.save_note(&note) {
+        if let Err(e) = self.notes.update(cx, |notes, _cx| notes.add(note.clone())) {
             eprintln!("保存新笔记失败: {}", e);
             return;
         }
@@ -81,17 +65,14 @@ impl AppView {
             editor.load_note(&note, cx);
         });
 
-        self.notes.insert(id, note);
         cx.notify();
     }
 
     fn delete_note(&mut self, note_id: u128, cx: &mut Context<Self>) {
-        if let Err(e) = self.storage.delete_note(note_id) {
+        if let Err(e) = self.notes.update(cx, |notes, _cx| notes.remove(note_id)) {
             eprintln!("删除笔记失败: {}", e);
             return;
         }
-
-        self.notes.retain(|k, _| k != &note_id);
 
         self.sidebar.update(cx, |sidebar, _cx| {
             sidebar.set_selected(None);
@@ -105,9 +86,13 @@ impl AppView {
     }
 
     fn select_note(&mut self, note_id: u128, cx: &mut Context<Self>) {
-        if let Some(note) = self.notes.get(&note_id) {
+        let note_clone = self
+            .notes
+            .update(cx, |notes, _cx| notes.get(note_id).cloned());
+
+        if let Some(note) = note_clone {
             self.editor.update(cx, |editor, cx| {
-                editor.load_note(note, cx);
+                editor.load_note(&note, cx);
             });
             self.sidebar.update(cx, |sidebar, _cx| {
                 sidebar.set_selected(Some(note_id));

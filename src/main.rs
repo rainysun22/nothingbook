@@ -3,6 +3,7 @@ use gpui::*;
 use crate::app::AppView;
 mod app;
 mod note;
+mod note_list;
 mod storage;
 mod views;
 
