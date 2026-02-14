@@ -86,9 +86,24 @@ impl Render for SidebarView {
                             )
                             .child(
                                 div()
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_base()
-                                    .child(note.title.clone()),
+                                    .flex()
+                                    .flex_row()
+                                    .justify_between()
+                                    .items_center()
+                                    .child(
+                                        div()
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .text_base()
+                                            .child(note.title.clone()),
+                                    )
+                                    .child(
+                                        Button::new("delete-note")
+                                            .label("删除")
+                                            .compact()
+                                            .on_click(cx.listener(move |_, _, _window, cx| {
+                                                cx.emit(SidebarEvent::DeleteNote(note_id));
+                                            })),
+                                    ),
                             )
                             .child(div().mt_1().text_sm().child(note.preview()))
                             .child(
